@@ -41,17 +41,19 @@ public:
   virtual bool IsDataValid(const Data& aData);
 
 protected:
-  void PaintWithOpacity(gfxContext* aContext,
+  void PaintWithOpacity(gfx::DrawTarget* aTarget,
                         float aOpacity,
-                        Layer* aMaskLayer,
-                        gfxContext::GraphicsOperator aOperator = gfxContext::OPERATOR_OVER);
+                        Layer* aMaskLayer);
 
-  void UpdateSurface(gfxASurface* aDestSurface = nullptr,
+
+                               // REMOVE???gfxContext::GraphicsOperator aOperator = gfxContext::OPERATOR_OVER);
+
+  void UpdateSurface(gfx::DataSourceSurface* aDestSurface = nullptr,
                      Layer* aMaskLayer = nullptr);
 
-  nsRefPtr<gfxASurface> mSurface;
+  RefPtr<gfx::SourceSurface> mSurface;
   nsRefPtr<mozilla::gl::GLContext> mGLContext;
-  mozilla::RefPtr<mozilla::gfx::DrawTarget> mDrawTarget;
+  RefPtr<gfx::DrawTarget> mDrawTarget;
 
   uint32_t mCanvasFramebuffer;
 
@@ -59,11 +61,12 @@ protected:
   bool mNeedsYFlip;
   bool mForceReadback;
 
-  nsRefPtr<gfxImageSurface> mCachedTempSurface;
+  RefPtr<gfx::DataSourceSurface> mCachedTempSurface;
   gfx::IntSize mCachedSize;
-  gfxImageFormat mCachedFormat;
+  gfx::SurfaceFormat mCachedFormat;
 
-  gfxImageSurface* GetTempSurface(const gfx::IntSize& aSize, const gfxImageFormat aFormat);
+  gfx::DataSourceSurface*
+    GetTempSurface(const gfx::IntSize& aSize, const gfx::SurfaceFormat aFormat);
 
   void DiscardTempSurface();
 };

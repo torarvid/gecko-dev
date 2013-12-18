@@ -47,7 +47,9 @@ CopyableCanvasLayer::Initialize(const Data& aData)
   NS_ASSERTION(mSurface == nullptr, "BasicCanvasLayer::Initialize called twice!");
 
   if (aData.mSurface) {
-    mSurface = aData.mSurface;
+    mSurface =
+      gfxPlatform::GetPlatform()->GetSourceSurfaceForSurface(nullptr,
+                                                             aData.mSurface);
     NS_ASSERTION(!aData.mGLContext, "CanvasLayer can't have both surface and GLContext");
     mNeedsYFlip = false;
   } else if (aData.mGLContext) {
@@ -60,8 +62,8 @@ CopyableCanvasLayer::Initialize(const Data& aData)
     // `GLScreenBuffer::Morph`ing is only needed in BasicShadowableCanvasLayer.
   } else if (aData.mDrawTarget) {
     mDrawTarget = aData.mDrawTarget;
-    mSurface =
-      gfxPlatform::GetPlatform()->CreateThebesSurfaceAliasForDrawTarget_hack(mDrawTarget);
+    RefPtr<SourceSurface> source = mDrawTarget->Snapshot();
+    mSurface = source->GetDataSurface();
     mNeedsYFlip = false;
   } else {
     NS_ERROR("CanvasLayer created without mSurface, mDrawTarget or mGLContext?");
@@ -77,7 +79,8 @@ CopyableCanvasLayer::IsDataValid(const Data& aData)
 }
 
 void
-CopyableCanvasLayer::UpdateSurface(gfxASurface* aDestSurface, Layer* aMaskLayer)
+CopyableCanvasLayer::UpdateSurface(DataSourceSurface* aDestSurface,
+                                   Layer* aMaskLayer)
 {
   if (!IsDirty())
     return;
@@ -85,21 +88,28 @@ CopyableCanvasLayer::UpdateSurface(gfxASurface* aDestSurface, Layer* aMaskLayer)
 
   if (mDrawTarget) {
     mDrawTarget->Flush();
-    mSurface =
-      gfxPlatform::GetPlatform()->CreateThebesSurfaceAliasForDrawTarget_hack(mDrawTarget);
+    RefPtr<SourceSurface> source = mDrawTarget->Snapshot();
+    mSurface = source->GetDataSurface();
   }
 
+  gfxPlatform* platform = gfxPlatform::GetPlatform();
+
   if (!mGLContext && aDestSurface) {
-    nsRefPtr<gfxContext> tmpCtx = new gfxContext(aDestSurface);
-    tmpCtx->SetOperator(gfxContext::OPERATOR_SOURCE);
-    CopyableCanvasLayer::PaintWithOpacity(tmpCtx, 1.0f, aMaskLayer);
+    BackendType backend =
+      platform->GetPreferredCanvasBackend();
+    RefPtr<DrawTarget> aTarget =
+      Factory::CreateDrawTarget(backend,
+                                aDestSurface->GetSize(),
+                                aDestSurface->GetFormat());
+//TODO?    tmpCtx->SetOperator(gfxContext::OPERATOR_SOURCE);
+    CopyableCanvasLayer::PaintWithOpacity(aTarget, 1.0f, aMaskLayer);
     return;
   }
 
   if (mGLContext) {
-    nsRefPtr<gfxImageSurface> readSurf;
+    RefPtr<SourceSurface> readSurf;
     RefPtr<DataSourceSurface> readDSurf;
-    nsRefPtr<gfxASurface> resultSurf;
+    RefPtr<DataSourceSurface> resultSurf;
 
     SharedSurface* sharedSurf = mGLContext->RequestFrame();
     if (!sharedSurf) {
@@ -108,9 +118,9 @@ CopyableCanvasLayer::UpdateSurface(gfxASurface* aDestSurface, Layer* aMaskLayer)
     }
 
     IntSize readSize(sharedSurf->Size());
-    gfxImageFormat format = (GetContentFlags() & CONTENT_OPAQUE)
-                            ? gfxImageFormatRGB24
-                            : gfxImageFormatARGB32;
+    SurfaceFormat format = (GetContentFlags() & CONTENT_OPAQUE)
+                            ? FORMAT_B8G8R8X8
+                            : FORMAT_B8G8R8A8;
 
     if (aDestSurface) {
       resultSurf = aDestSurface;
@@ -118,7 +128,7 @@ CopyableCanvasLayer::UpdateSurface(gfxASurface* aDestSurface, Layer* aMaskLayer)
       resultSurf = GetTempSurface(readSize, format);
     }
     MOZ_ASSERT(resultSurf);
-    if (resultSurf->CairoStatus() != 0) {
+    if (!resultSurf->IsValid()) {
       MOZ_ASSERT(false, "Bad resultSurf->CairoStatus().");
       return;
     }
@@ -131,36 +141,35 @@ CopyableCanvasLayer::UpdateSurface(gfxASurface* aDestSurface, Layer* aMaskLayer)
       // readSurf and readDSurf may not leave the scope they were declared in.
       SharedSurface_Basic* sharedSurf_Basic = SharedSurface_Basic::Cast(surfGL);
       readDSurf = sharedSurf_Basic->GetData();
-      readSurf = new gfxImageSurface(readDSurf->GetData(),
-                                     ThebesIntSize(readDSurf->GetSize()),
-                                     readDSurf->Stride(),
-                                     SurfaceFormatToImageFormat(readDSurf->GetFormat()));
+      readSurf = readDSurf->GetData();
     } else {
-      if (ToIntSize(resultSurf->GetSize()) != readSize ||
-          !(readSurf = resultSurf->GetAsImageSurface()) ||
-          readSurf->Format() != format)
+      if (resultSurf->GetSize() != readSize ||
+          !(readSurf = resultSurf->GetDataSurface()) ||
+          readSurf->GetFormat() != format)
       {
         readSurf = GetTempSurface(readSize, format);
       }
 
       // Readback handles Flush/MarkDirty.
-      mGLContext->Screen()->Readback(surfGL, readSurf);
+//TODO mGLContext->Screen()->Readback(surfGL, readSurf);
     }
     MOZ_ASSERT(readSurf);
 
     bool needsPremult = surfGL->HasAlpha() && !mIsGLAlphaPremult;
     if (needsPremult) {
-      readSurf->Flush();
-      gfxUtils::PremultiplyImageSurface(readSurf);
-      readSurf->MarkDirty();
+// TODO?      readSurf->Flush();
+// TODO      gfxUtils::PremultiplyImageSurface(readSurf);
+// TODO      readSurf->GetDataSurface().MarkDirty();
     }
     
     if (readSurf != resultSurf) {
-      readSurf->Flush();
-      nsRefPtr<gfxContext> ctx = new gfxContext(resultSurf);
-      ctx->SetOperator(gfxContext::OPERATOR_SOURCE);
-      ctx->SetSource(readSurf);
-      ctx->Paint();
+// TODO?      readSurf->Flush();
+      BackendType backend = platform->GetPreferredCanvasBackend();
+      RefPtr<DrawTarget> aTarget =
+        Factory::CreateDrawTarget(backend,
+                                  resultSurf->GetSize(),
+                                  resultSurf->GetFormat());
+// TODO      aTarget->DrawSurface(readSurf, TODO, TODO, TODO);
     }
 
     // If !aDestSurface then we will end up painting using mSurface, so
@@ -172,27 +181,24 @@ CopyableCanvasLayer::UpdateSurface(gfxASurface* aDestSurface, Layer* aMaskLayer)
 }
 
 void
-CopyableCanvasLayer::PaintWithOpacity(gfxContext* aContext,
+CopyableCanvasLayer::PaintWithOpacity(DrawTarget* aTarget,
                                       float aOpacity,
-                                      Layer* aMaskLayer,
-                                      gfxContext::GraphicsOperator aOperator)
+                                      Layer* aMaskLayer)
 {
   if (!mSurface) {
     NS_WARNING("No valid surface to draw!");
     return;
   }
 
-  nsRefPtr<gfxPattern> pat = new gfxPattern(mSurface);
+  SurfacePattern sp =
+    new SurfacePattern(mSurface, EXTEND_CLAMP, Matrix(), mFilter);
 
-  pat->SetFilter(mFilter);
-  pat->SetExtend(gfxPattern::EXTEND_PAD);
-
-  gfxMatrix m;
-  if (mNeedsYFlip) {
-    m = aContext->CurrentMatrix();
-    aContext->Translate(gfxPoint(0.0, mBounds.height));
-    aContext->Scale(1.0, -1.0);
-  }
+//  gfxMatrix m;
+//  if (mNeedsYFlip) {
+//    m = aContext->CurrentMatrix();
+//    aContext->Translate(gfxPoint(0.0, mBounds.height));
+//    aContext->Scale(1.0, -1.0);
+//  }
 
   // If content opaque, then save off current operator and set to source.
   // This ensures that alpha is not applied even if the source surface
@@ -203,7 +209,7 @@ CopyableCanvasLayer::PaintWithOpacity(gfxContext* aContext,
     aContext->SetOperator(gfxContext::OPERATOR_SOURCE);
   }
 
-  AutoSetOperator setOperator(aContext, aOperator);
+// TODO  AutoSetOperator setOperator(aContext, aOperator);
   aContext->NewPath();
   // No need to snap here; our transform is already set up to snap our rect
   aContext->Rectangle(gfxRect(0, 0, mBounds.width, mBounds.height));
@@ -220,20 +226,21 @@ CopyableCanvasLayer::PaintWithOpacity(gfxContext* aContext,
   }
 }
 
-gfxImageSurface*
-CopyableCanvasLayer::GetTempSurface(const IntSize& aSize, const gfxImageFormat aFormat)
+TemporaryRef<DataSourceSurface>
+CopyableCanvasLayer::GetTempSurface(const IntSize& aSize,
+                                    const SurfaceFormat aFormat)
 {
   if (!mCachedTempSurface ||
       aSize.width != mCachedSize.width ||
       aSize.height != mCachedSize.height ||
       aFormat != mCachedFormat)
   {
-    mCachedTempSurface = new gfxImageSurface(ThebesIntSize(aSize), aFormat);
+    mCachedTempSurface = Factory::CreateDataSourceSurface(aSize, aFormat);
     mCachedSize = aSize;
     mCachedFormat = aFormat;
   }
 
-  MOZ_ASSERT(mCachedTempSurface->Stride() == mCachedTempSurface->Width() * 4);
+  MOZ_ASSERT(mCachedTempSurface->Stride() == mCachedTempSurface->GetWidth() * 4);
   return mCachedTempSurface;
 }
 
