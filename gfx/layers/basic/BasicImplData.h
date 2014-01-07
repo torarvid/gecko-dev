@@ -59,7 +59,7 @@ public:
    * set up to account for all the properties of the layer (transform,
    * opacity, etc).
    */
-  virtual void Paint(gfxContext* aContext, Layer* aMaskLayer) {}
+  virtual void Paint(gfx::DrawTarget* aTarget, Layer* aMaskLayer) {}
 
   /**
    * Like Paint() but called for ThebesLayers with the additional parameters

@@ -338,7 +338,7 @@ BasicLayerManager::PopGroupToSourceWithCachedSurface(gfxContext *aTarget, gfxCon
 }
 
 void
-BasicLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
+BasicLayerManager::BeginTransactionWithTarget(DrawTarget* aTarget)
 {
   mInTransaction = true;
 
@@ -813,7 +813,7 @@ Transform3D(RefPtr<SourceSurface> aSource,
 
 void
 BasicLayerManager::PaintSelfOrChildren(PaintLayerContext& aPaintContext,
-                                       gfxContext* aGroupTarget)
+                                       DrawTarget* aGroupTarget)
 {
   BasicImplData* data = ToData(aPaintContext.mLayer);
 
@@ -821,7 +821,7 @@ BasicLayerManager::PaintSelfOrChildren(PaintLayerContext& aPaintContext,
   Layer* child = aPaintContext.mLayer->GetFirstChild();
   if (!child) {
     if (aPaintContext.mLayer->AsThebesLayer()) {
-      data->PaintThebes(aGroupTarget, aPaintContext.mLayer->GetMaskLayer(),
+      data->PaintThebes(new gfxContext(aGroupTarget), aPaintContext.mLayer->GetMaskLayer(),
           aPaintContext.mCallback, aPaintContext.mCallbackData,
           aPaintContext.mReadback);
     } else {
@@ -837,7 +837,7 @@ BasicLayerManager::PaintSelfOrChildren(PaintLayerContext& aPaintContext,
     nsAutoTArray<Layer*, 12> children;
     container->SortChildrenBy3DZOrder(children);
     for (uint32_t i = 0; i < children.Length(); i++) {
-      PaintLayer(aGroupTarget, children.ElementAt(i), aPaintContext.mCallback,
+      PaintLayer(new gfxContext(aGroupTarget), children.ElementAt(i), aPaintContext.mCallback,
           aPaintContext.mCallbackData, &readback);
       if (mTransactionIncomplete)
         break;
@@ -870,14 +870,15 @@ BasicLayerManager::FlushGroup(PaintLayerContext& aPaintContext, bool aNeedsClipT
 }
 
 void
-BasicLayerManager::PaintLayer(gfxContext* aTarget,
+BasicLayerManager::PaintLayer(DrawTarget* aTarget,
                               Layer* aLayer,
                               DrawThebesLayerCallback aCallback,
                               void* aCallbackData,
                               ReadbackProcessor* aReadback)
 {
+  gfxContext aContext = new gfxContext(aTarget);
   PROFILER_LABEL("BasicLayerManager", "PaintLayer");
-  PaintLayerContext paintLayerContext(aTarget, aLayer, aCallback, aCallbackData, aReadback);
+  PaintLayerContext paintLayerContext(aContext, aLayer, aCallback, aCallbackData, aReadback);
 
   // Don't attempt to paint layers with a singular transform, cairo will
   // just throw an error.
@@ -912,12 +913,12 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
   bool needsSaveRestore =
     needsGroup || clipRect || needsClipToVisibleRegion || !is2D;
   if (needsSaveRestore) {
-    contextSR.SetContext(aTarget);
+    contextSR.SetContext(aContext);
 
     if (clipRect) {
-      aTarget->NewPath();
-      aTarget->SnappedRectangle(gfxRect(clipRect->x, clipRect->y, clipRect->width, clipRect->height));
-      aTarget->Clip();
+      aContext->NewPath();
+      aContext->SnappedRectangle(gfxRect(clipRect->x, clipRect->y, clipRect->width, clipRect->height));
+      aContext->Clip();
     }
   }
 
@@ -926,7 +927,7 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
   const nsIntRegion& visibleRegion = aLayer->GetEffectiveVisibleRegion();
   // If needsGroup is true, we'll clip to the visible region after we've popped the group
   if (needsClipToVisibleRegion && !needsGroup) {
-    gfxUtils::ClipToRegion(aTarget, visibleRegion);
+    gfxUtils::ClipToRegion(aContext, visibleRegion);
     // Don't need to clip to visible region again
     needsClipToVisibleRegion = false;
   }
@@ -935,21 +936,21 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
     paintLayerContext.AnnotateOpaqueRect();
   }
 
-  bool clipIsEmpty = !aTarget || aTarget->GetClipExtents().IsEmpty();
+  bool clipIsEmpty = !aContext || aContext->GetClipExtents().IsEmpty();
   if (clipIsEmpty) {
-    PaintSelfOrChildren(paintLayerContext, aTarget);
+    PaintSelfOrChildren(paintLayerContext, aContext);
     return;
   }
 
   if (is2D) {
     if (needsGroup) {
-      nsRefPtr<gfxContext> groupTarget = PushGroupForLayer(aTarget, aLayer, aLayer->GetEffectiveVisibleRegion(),
+      nsRefPtr<gfxContext> groupTarget = PushGroupForLayer(aContext, aLayer, aLayer->GetEffectiveVisibleRegion(),
                                       &needsClipToVisibleRegion);
       PaintSelfOrChildren(paintLayerContext, groupTarget);
-      PopGroupToSourceWithCachedSurface(aTarget, groupTarget);
+      PopGroupToSourceWithCachedSurface(aContext, groupTarget);
       FlushGroup(paintLayerContext, needsClipToVisibleRegion);
     } else {
-      PaintSelfOrChildren(paintLayerContext, aTarget);
+      PaintSelfOrChildren(paintLayerContext, aContext);
     }
   } else {
     const nsIntRect& bounds = visibleRegion.GetBounds();
@@ -985,17 +986,17 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
 #endif
     const gfx3DMatrix& effectiveTransform = aLayer->GetEffectiveTransform();
     nsRefPtr<gfxASurface> result =
-      Transform3D(untransformedDT->Snapshot(), aTarget, bounds,
+      Transform3D(untransformedDT->Snapshot(), aContext, bounds,
                   effectiveTransform, destRect);
 
     if (result) {
-      aTarget->SetSource(result, destRect.TopLeft());
+      aContext->SetSource(result, destRect.TopLeft());
       // Azure doesn't support EXTEND_NONE, so to avoid extending the edges
       // of the source surface out to the current clip region, clip to
       // the rectangle of the result surface now.
-      aTarget->NewPath();
-      aTarget->SnappedRectangle(destRect);
-      aTarget->Clip();
+      aContext->NewPath();
+      aContext->SnappedRectangle(destRect);
+      aContext->Clip();
       FlushGroup(paintLayerContext, needsClipToVisibleRegion);
     }
   }

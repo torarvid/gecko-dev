@@ -52,7 +52,7 @@ public:
     ImageLayer::SetVisibleRegion(aRegion);
   }
 
-  virtual void Paint(gfxContext* aContext, Layer* aMaskLayer);
+  virtual void Paint(DrawTarget* aTarget, Layer* aMaskLayer);
 
   virtual bool GetAsSurface(gfxASurface** aSurface,
                             SurfaceDescriptor* aDescriptor);
@@ -73,12 +73,12 @@ protected:
 };
 
 void
-BasicImageLayer::Paint(gfxContext* aContext, Layer* aMaskLayer)
+BasicImageLayer::Paint(DrawTarget* aTarget, Layer* aMaskLayer)
 {
   if (IsHidden())
     return;
   nsRefPtr<gfxPattern> dontcare =
-    GetAndPaintCurrentImage(aContext, GetEffectiveOpacity(), aMaskLayer);
+    GetAndPaintCurrentImage(new gfxContext(aTarget), GetEffectiveOpacity(), aMaskLayer);
 }
 
 already_AddRefed<gfxPattern>

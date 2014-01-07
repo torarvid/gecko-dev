@@ -65,7 +65,7 @@ protected:
   gfx::IntSize mCachedSize;
   gfx::SurfaceFormat mCachedFormat;
 
-  gfx::DataSourceSurface*
+  TemporaryRef<gfx::DataSourceSurface>
     GetTempSurface(const gfx::IntSize& aSize, const gfx::SurfaceFormat aFormat);
 
   void DiscardTempSurface();

@@ -18,7 +18,7 @@ namespace mozilla {
 namespace layers {
 
 void
-BasicCanvasLayer::Paint(gfxContext* aContext, Layer* aMaskLayer)
+BasicCanvasLayer::Paint(gfx::DrawTarget* aTarget, Layer* aMaskLayer)
 {
   if (IsHidden())
     return;
@@ -28,8 +28,7 @@ BasicCanvasLayer::Paint(gfxContext* aContext, Layer* aMaskLayer)
   FireDidTransactionCallback();
 
 //TODO  gfxContext::GraphicsOperator mixBlendMode = GetEffectiveMixBlendMode();
-  RefPtr<DrawTarget>
-  PaintWithOpacity(aContext, GetEffectiveOpacity());
+  PaintWithOpacity(aTarget, GetEffectiveOpacity(), aMaskLayer);
 }
 
 already_AddRefed<CanvasLayer>

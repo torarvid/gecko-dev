@@ -43,10 +43,11 @@ public:
     ColorLayer::SetVisibleRegion(aRegion);
   }
 
-  virtual void Paint(gfxContext* aContext, Layer* aMaskLayer)
+  virtual void Paint(DrawTarget* aTarget, Layer* aMaskLayer)
   {
     if (IsHidden())
       return;
+    gfxContext* aContext = new gfxContext(aTarget);
     gfxContextAutoSaveRestore contextSR(aContext);
     gfxContext::GraphicsOperator mixBlendMode = GetEffectiveMixBlendMode();
     AutoSetOperator setOptimizedOperator(aContext, mixBlendMode != gfxContext::OPERATOR_OVER ? mixBlendMode : GetOperator());

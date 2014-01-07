@@ -34,7 +34,7 @@ public:
     CanvasLayer::SetVisibleRegion(aRegion);
   }
   
-  virtual void Paint(gfxContext* aContext, Layer* aMaskLayer);
+  virtual void Paint(gfx::DrawTarget* aTarget, Layer* aMaskLayer);
  
 protected:
   BasicLayerManager* BasicManager()

@@ -92,7 +92,7 @@ public:
   virtual bool IsWidgetLayerManager() { return mWidget != nullptr; }
 
   virtual void BeginTransaction();
-  virtual void BeginTransactionWithTarget(gfxContext* aTarget);
+  virtual void BeginTransactionWithTarget(gfx::DrawTarget* aTarget);
   virtual bool EndEmptyTransaction(EndTransactionFlags aFlags = END_DEFAULT);
   virtual void EndTransaction(DrawThebesLayerCallback aCallback,
                               void* aCallbackData,
@@ -121,8 +121,8 @@ public:
 #endif
   bool InTransaction() { return mPhase != PHASE_NONE; }
 
-  gfxContext* GetTarget() { return mTarget; }
-  void SetTarget(gfxContext* aTarget) { mUsingDefaultTarget = false; mTarget = aTarget; }
+  gfxContext* GetTarget() { return new gfxContext(mTarget); }
+  void SetTarget(gfx::DrawTarget* aTarget) { mUsingDefaultTarget = false; mTarget = aTarget; }
   bool IsRetained() { return mWidget != nullptr; }
 
   virtual const char* Name() const { return "Basic"; }
@@ -153,14 +153,15 @@ protected:
   // This is the main body of the PaintLayer routine which will if it has
   // children, recurse into PaintLayer() otherwise it will paint using the
   // underlying Paint() method of the Layer. It will not do both.
-  void PaintSelfOrChildren(PaintLayerContext& aPaintContext, gfxContext* aGroupTarget);
+  void PaintSelfOrChildren(PaintLayerContext& aPaintContext,
+                           gfx::DrawTarget* aGroupTarget);
 
   // Paint the group onto the underlying target. This is used by PaintLayer to
   // flush the group to the underlying target.
   void FlushGroup(PaintLayerContext& aPaintContext, bool aNeedsClipToVisibleRegion);
 
   // Paints aLayer to mTarget.
-  void PaintLayer(gfxContext* aTarget,
+  void PaintLayer(gfx::DrawTarget* aTarget,
                   Layer* aLayer,
                   DrawThebesLayerCallback aCallback,
                   void* aCallbackData,
@@ -183,7 +184,7 @@ protected:
   // The default context for BeginTransaction.
   nsRefPtr<gfxContext> mDefaultTarget;
   // The context to draw into.
-  nsRefPtr<gfxContext> mTarget;
+  RefPtr<gfx::DrawTarget> mTarget;
   // Image factory we use.
   nsRefPtr<ImageFactory> mFactory;
 

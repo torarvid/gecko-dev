@@ -107,8 +107,7 @@ CopyableCanvasLayer::UpdateSurface(DataSourceSurface* aDestSurface,
   }
 
   if (mGLContext) {
-    RefPtr<SourceSurface> readSurf;
-    RefPtr<DataSourceSurface> readDSurf;
+    RefPtr<DataSourceSurface> readSurf;
     RefPtr<DataSourceSurface> resultSurf;
 
     SharedSurface* sharedSurf = mGLContext->RequestFrame();
@@ -137,11 +136,10 @@ CopyableCanvasLayer::UpdateSurface(DataSourceSurface* aDestSurface,
     SharedSurface_GL* surfGL = SharedSurface_GL::Cast(sharedSurf);
 
     if (surfGL->Type() == SharedSurfaceType::Basic) {
-      // sharedSurf_Basic->mData must outlive readSurf and readDSurf. Alas,
-      // readSurf and readDSurf may not leave the scope they were declared in.
+      // sharedSurf_Basic->mData must outlive readSurf. Alas, readSurf may not
+      // leave the scope it was declared in.
       SharedSurface_Basic* sharedSurf_Basic = SharedSurface_Basic::Cast(surfGL);
-      readDSurf = sharedSurf_Basic->GetData();
-      readSurf = readDSurf->GetData();
+      readSurf = sharedSurf_Basic->GetData();
     } else {
       if (resultSurf->GetSize() != readSize ||
           !(readSurf = resultSurf->GetDataSurface()) ||
@@ -190,8 +188,11 @@ CopyableCanvasLayer::PaintWithOpacity(DrawTarget* aTarget,
     return;
   }
 
-  SurfacePattern sp =
-    new SurfacePattern(mSurface, EXTEND_CLAMP, Matrix(), mFilter);
+  SurfacePattern* sp =
+    new SurfacePattern(mSurface,
+                       EXTEND_CLAMP,
+                       Matrix(),
+                       gfx::ToFilter(mFilter));
 
 //  gfxMatrix m;
 //  if (mNeedsYFlip) {
@@ -205,11 +206,13 @@ CopyableCanvasLayer::PaintWithOpacity(DrawTarget* aTarget,
   // has an alpha channel
   gfxContext::GraphicsOperator savedOp;
   if (GetContentFlags() & CONTENT_OPAQUE) {
-    savedOp = aContext->CurrentOperator();
-    aContext->SetOperator(gfxContext::OPERATOR_SOURCE);
+// TODO    savedOp = aContext->CurrentOperator();
+// TODO    aContext->SetOperator(gfxContext::OPERATOR_SOURCE);
   }
 
-// TODO  AutoSetOperator setOperator(aContext, aOperator);
+// TODO this block...
+  /*
+  AutoSetOperator setOperator(aContext, aOperator);
   aContext->NewPath();
   // No need to snap here; our transform is already set up to snap our rect
   aContext->Rectangle(gfxRect(0, 0, mBounds.width, mBounds.height));
@@ -224,6 +227,7 @@ CopyableCanvasLayer::PaintWithOpacity(DrawTarget* aTarget,
   if (mNeedsYFlip) {
     aContext->SetMatrix(m);
   }
+   */
 }
 
 TemporaryRef<DataSourceSurface>
@@ -240,7 +244,7 @@ CopyableCanvasLayer::GetTempSurface(const IntSize& aSize,
     mCachedFormat = aFormat;
   }
 
-  MOZ_ASSERT(mCachedTempSurface->Stride() == mCachedTempSurface->GetWidth() * 4);
+  MOZ_ASSERT(mCachedTempSurface->Stride() == mCachedSize.width * 4);
   return mCachedTempSurface;
 }
 
