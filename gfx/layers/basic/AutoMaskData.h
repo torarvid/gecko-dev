@@ -7,7 +7,10 @@
 #define GFX_AUTOMASKDATA_H_
 
 #include "gfxASurface.h"
+#include "gfxMatrix.h"
+#include "ipc/AutoOpenSurface.h"
 #include "mozilla/layers/LayersSurfaces.h"  // for SurfaceDescriptor
+#include "mozilla/Maybe.h"
 
 namespace mozilla {
 namespace layers {

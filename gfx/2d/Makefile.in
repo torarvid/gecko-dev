@@ -31,3 +31,6 @@ endif
 endif
 
 CXXFLAGS += $(MOZ_CAIRO_CFLAGS)
+
+PremultiplyTables.h: $(srcdir)/genTables.py
+	$(PYTHON) $(srcdir)/genTables.py

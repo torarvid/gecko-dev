@@ -30,6 +30,7 @@ EXPORTS.mozilla.gfx += [
     'Tools.h',
     'Types.h',
     'UserData.h',
+    'Utils.h',
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
@@ -114,6 +115,7 @@ UNIFIED_SOURCES += [
     'ScaledFontCairo.cpp',
     'SourceSurfaceCairo.cpp',
     'SourceSurfaceRawData.cpp',
+    'Utils.cpp',
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
@@ -144,3 +146,7 @@ DEFINES['SK_B32_SHIFT'] = 0
 if CONFIG['MOZ_DEBUG']:
     DEFINES['GFX_LOG_DEBUG'] = True
     DEFINES['GFX_LOG_WARNING'] = True
+
+GENERATED_FILES = [
+    'PremultiplyTables.h',
+]
