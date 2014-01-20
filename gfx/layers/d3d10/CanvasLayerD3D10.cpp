@@ -92,24 +92,47 @@ CanvasLayerD3D10::Initialize(const Data& aData)
     
     // XXX we should store mDrawTarget and use it directly in UpdateSurface,
     // bypassing Thebes
-    mSurface = gfxPlatform::GetPlatform()->GetThebesSurfaceForDrawTarget(mDrawTarget);
+    mSurface = mDrawTarget->Snapshot();
   } else {
     NS_ERROR("CanvasLayer created without mSurface, mDrawTarget or mGLContext?");
   }
 
   mBounds.SetRect(0, 0, aData.mSize.width, aData.mSize.height);
 
-  if (mSurface && mSurface->GetType() == gfxSurfaceType::D2D) {
-    void *data = mSurface->GetData(&gKeyD3D10Texture);
-    if (data) {
-      mTexture = static_cast<ID3D10Texture2D*>(data);
+
+
+
+
+  if (mSurface && mSurface->GetType() == SurfaceType::D2D1_DRAWTARGET) {
+    DataSourceSurface::MappedSurface ms;
+    TemporaryRef<DataSourceSurface> dss = mSurface->GetDataSurface();
+    if (dss.drop()->Map(DataSourceSurface::MapType::READ_WRITE, &ms)) {
+      //mTexture = static_cast<ID3D10Texture2D*>(ms.mData);
       mIsD2DTexture = true;
       device()->CreateShaderResourceView(mTexture, nullptr, getter_AddRefs(mSRView));
       mHasAlpha =
-        mSurface->GetContentType() == gfxContentType::COLOR_ALPHA;
+        mSurface->GetFormat() == SurfaceFormat::B8G8R8A8 ||
+        mSurface->GetFormat() == SurfaceFormat::R8G8B8A8;
       return;
     }
   }
+
+
+
+  //if (mSurface && mSurface->GetType() == gfxSurfaceType::D2D) {
+  //  void *data = mSurface->GetData(&gKeyD3D10Texture);
+  //  if (data) {
+  //    mTexture = static_cast<ID3D10Texture2D*>(data);
+  //    mIsD2DTexture = true;
+  //    device()->CreateShaderResourceView(mTexture, nullptr, getter_AddRefs(mSRView));
+  //    mHasAlpha =
+  //      mSurface->GetContentType() == gfxContentType::COLOR_ALPHA;
+  //    return;
+  //  }
+  //}
+
+
+
 
   mIsD2DTexture = false;
 
@@ -137,7 +160,6 @@ CanvasLayerD3D10::UpdateSurface()
   if (mDrawTarget) {
     mDrawTarget->Flush();
   } else if (mIsD2DTexture) {
-    mSurface->Flush();
     return;
   }
 
@@ -203,16 +225,18 @@ CanvasLayerD3D10::UpdateSurface()
       return;
     }
 
-    nsRefPtr<gfxImageSurface> dstSurface;
+//TODO    DrawTarget* dt = Factory::CreateDrawTargetForD3D10Texture(mTexture, SurfaceFormat::R8G8B8A8);
 
-    dstSurface = new gfxImageSurface((unsigned char*)map.pData,
-                                     gfxIntSize(mBounds.width, mBounds.height),
-                                     map.RowPitch,
-                                     gfxImageFormat::ARGB32);
-    nsRefPtr<gfxContext> ctx = new gfxContext(dstSurface);
-    ctx->SetOperator(gfxContext::OPERATOR_SOURCE);
-    ctx->SetSource(mSurface);
-    ctx->Paint();
+    //nsRefPtr<gfxImageSurface> dstSurface;
+
+    //dstSurface = new gfxImageSurface((unsigned char*)map.pData,
+    //                                 gfxIntSize(mBounds.width, mBounds.height),
+    //                                 map.RowPitch,
+    //                                 gfxImageFormat::ARGB32);
+    //nsRefPtr<gfxContext> ctx = new gfxContext(dstSurface);
+    //ctx->SetOperator(gfxContext::OPERATOR_SOURCE);
+    //ctx->SetSource(mSurface);
+    //ctx->Paint();
     
     mTexture->Unmap(0);
     mSRView = mUploadSRView;

@@ -19,6 +19,7 @@
 #include "GraphicsFilter.h"             // for GraphicsFilter
 #include "gfxPoint.h"                   // for gfxPoint
 #include "gfxRect.h"                    // for gfxRect
+#include "gfx2DGlue.h"
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT_HELPER2, etc
 #include "mozilla/DebugOnly.h"          // for DebugOnly
 #include "mozilla/EventForwards.h"      // for nsPaintEvent
@@ -787,7 +788,7 @@ public:
     }
   }
 
-  void SetMixBlendMode(gfxContext::GraphicsOperator aMixBlendMode)
+  void SetMixBlendMode(gfx::CompositionOp aMixBlendMode)
   {
     if (mMixBlendMode != aMixBlendMode) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) MixBlendMode", this));
@@ -796,6 +797,11 @@ public:
     }
   }
   
+  void DeprecatedSetMixBlendMode(gfxContext::GraphicsOperator aMixBlendMode)
+  {
+    SetMixBlendMode(gfx::CompositionOpForOp(aMixBlendMode));
+  }
+
   void SetForceIsolatedGroup(bool aForceIsolatedGroup)
   {
     if(mForceIsolatedGroup != aForceIsolatedGroup) {
@@ -1035,7 +1041,7 @@ public:
 
   // These getters can be used anytime.
   float GetOpacity() { return mOpacity; }
-  gfxContext::GraphicsOperator GetMixBlendMode() const { return mMixBlendMode; }
+  gfx::CompositionOp GetMixBlendMode() const { return mMixBlendMode; }
   const nsIntRect* GetClipRect() { return mUseClipRect ? &mClipRect : nullptr; }
   uint32_t GetContentFlags() { return mContentFlags; }
   const nsIntRegion& GetVisibleRegion() { return mVisibleRegion; }
@@ -1209,7 +1215,8 @@ public:
   /**
    * Returns the blendmode of this layer.
    */
-  gfxContext::GraphicsOperator GetEffectiveMixBlendMode();
+  gfx::CompositionOp GetEffectiveMixBlendMode();
+  gfxContext::GraphicsOperator DeprecatedGetEffectiveMixBlendMode();
   
   /**
    * This returns the effective transform computed by
@@ -1410,7 +1417,7 @@ protected:
   AnimationArray mAnimations;
   InfallibleTArray<AnimData> mAnimationData;
   float mOpacity;
-  gfxContext::GraphicsOperator mMixBlendMode;
+  gfx::CompositionOp mMixBlendMode;
   bool mForceIsolatedGroup;
   nsIntRect mClipRect;
   nsIntRect mTileSourceRect;
@@ -1793,7 +1800,7 @@ public:
     { }
 
     // One of these two must be specified for Canvas2D, but never both
-    gfxASurface* mSurface;  // a gfx Surface for the canvas contents
+    gfx::SourceSurface* mSurface;  // a SourceSurface for the canvas contents
     mozilla::gfx::DrawTarget *mDrawTarget; // a DrawTarget for the canvas contents
 
     // Or this, for GL.
