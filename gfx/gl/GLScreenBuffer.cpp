@@ -20,6 +20,7 @@
 #include "SharedSurfaceIO.h"
 #endif
 #include "ScopedGLHelpers.h"
+#include "gfx2DGlue.h"
 
 using namespace mozilla::gfx;
 
@@ -478,9 +479,20 @@ GLScreenBuffer::CreateRead(SharedSurface_GL* surf)
     return ReadBuffer::Create(gl, caps, formats, surf);
 }
 
+void
+GLScreenBuffer::Readback(SharedSurface_GL* src, DataSourceSurface* dest)
+{
+  MOZ_ASSERT(src && dest);
+  nsRefPtr<gfxImageSurface> wrappedDest =
+    new gfxImageSurface(dest->GetData(),
+                        ThebesIntSize(dest->GetSize()),
+                        dest->Stride(),
+                        SurfaceFormatToImageFormat(dest->GetFormat()));
+  DeprecatedReadback(src, wrappedDest);
+}
 
 void
-GLScreenBuffer::Readback(SharedSurface_GL* src, gfxImageSurface* dest)
+GLScreenBuffer::DeprecatedReadback(SharedSurface_GL* src, gfxImageSurface* dest)
 {
     MOZ_ASSERT(src && dest);
     MOZ_ASSERT(ToIntSize(dest->GetSize()) == src->Size());
@@ -508,8 +520,6 @@ GLScreenBuffer::Readback(SharedSurface_GL* src, gfxImageSurface* dest)
         SharedSurf()->LockProd();
     }
 }
-
-
 
 DrawBuffer*
 DrawBuffer::Create(GLContext* const gl,
