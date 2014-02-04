@@ -49,6 +49,7 @@ CopyableCanvasLayer::Initialize(const Data& aData)
   NS_ASSERTION(mSurface == nullptr, "BasicCanvasLayer::Initialize called twice!");
 
   if (aData.mSurface) {
+    MOZ_CRASH();
     mSurface = aData.mSurface;
     RefPtr<DataSourceSurface> dss = mSurface->GetDataSurface();
     mDeprecatedSurface =

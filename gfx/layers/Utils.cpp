@@ -27,10 +27,9 @@ PremultiplySurface(DataSourceSurface* srcSurface,
     destSurface = srcSurface;
 
   IntSize srcSize = srcSurface->GetSize();
-  IntSize destSize = destSurface->GetSize();
   MOZ_ASSERT(srcSurface->GetFormat() == destSurface->GetFormat() &&
-             srcSize.width  == destSize.width &&
-             srcSize.height  == destSize.height &&
+             srcSize.width  == destSurface->GetSize().width &&
+             srcSize.height  == destSurface->GetSize().height &&
              srcSurface->Stride() == destSurface->Stride(),
              "Source and destination surfaces don't have identical characteristics");
 

@@ -147,42 +147,6 @@ CanvasLayerD3D9::UpdateSurface()
              ms.mData + ms.mStride * y,
              mBounds.width * 4);
     }
-
-    //nsRefPtr<gfxImageSurface> sourceSurface;
-
-    //if (mSurface->GetType() == gfxSurfaceType::Win32) {
-    //  sourceSurface = mSurface->GetAsImageSurface();
-    //} else if (mSurface->GetType() == gfxSurfaceType::Image) {
-    //  sourceSurface = static_cast<gfxImageSurface*>(mSurface.get());
-    //  if (sourceSurface->Format() != gfxImageFormat::ARGB32 &&
-    //      sourceSurface->Format() != gfxImageFormat::RGB24)
-    //  {
-    //    return;
-    //  }
-    //} else {
-    //  sourceSurface = new gfxImageSurface(gfxIntSize(mBounds.width, mBounds.height),
-    //                                      gfxImageFormat::ARGB32);
-    //  nsRefPtr<gfxContext> ctx = new gfxContext(sourceSurface);
-    //  ctx->SetOperator(gfxContext::OPERATOR_SOURCE);
-    //  ctx->SetSource(mSurface);
-    //  ctx->Paint();
-    //}
-
-    //uint8_t *startBits = sourceSurface->Data();
-    //uint32_t sourceStride = sourceSurface->Stride();
-
-    //if (sourceSurface->Format() != gfxImageFormat::ARGB32) {
-    //  mHasAlpha = false;
-    //} else {
-    //  mHasAlpha = true;
-    //}
-
-    //for (int y = 0; y < mBounds.height; y++) {
-    //  memcpy((uint8_t*)lockedRect.pBits + lockedRect.Pitch * y,
-    //         startBits + sourceStride * y,
-    //         mBounds.width * 4);
-    //}
-
   }
 }
 
