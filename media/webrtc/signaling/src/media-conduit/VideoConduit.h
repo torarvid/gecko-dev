@@ -206,6 +206,7 @@ public:
 #ifdef WEBRTC_GONK
                       mExtDecoder(nullptr),
 #endif
+                      mPtrExtCodec(nullptr),
                       mEngineTransmitting(false),
                       mEngineReceiving(false),
                       mChannel(-1),
@@ -286,7 +287,7 @@ private:
   ScopedCustomReleasePtr<webrtc::ViERTP_RTCP> mPtrRTP;
 
   webrtc::ViEExternalCapture* mPtrExtCapture; // shared
-  webrtc::ViEExternalCodec*  mPtrExtCodec;
+  webrtc::ViEExternalCodec* mPtrExtCodec;
 
   // Engine state we are concerned with.
   bool mEngineTransmitting; //If true ==> Transmit Sub-system is up and running
@@ -298,6 +299,11 @@ private:
   VideoCodecConfig* mCurSendCodecConfig;
   unsigned short mSendingWidth;
   unsigned short mSendingHeight;
+
+#ifdef VIDEOCONDUIT_INSERT_TIMESTAMP
+  PRIntervalTime mStartTime;
+  uint32_t mSentFrames;
+#endif
 
   mozilla::RefPtr<WebrtcAudioConduit> mSyncedTo;
 

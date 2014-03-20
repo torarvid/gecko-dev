@@ -11,6 +11,7 @@
 #include "CSFVideoTermination.h"
 #include "MediaConduitErrors.h"
 #include "MediaConduitInterface.h"
+#include "OpenH264VideoCodec.h"
 #include "MediaPipeline.h"
 #include "MediaPipelineFilter.h"
 #include "VcmSIPCCBinding.h"
@@ -36,10 +37,6 @@
 #include <ssl.h>
 #include <sslproto.h>
 #include <algorithm>
-
-#ifdef MOZ_WIDGET_GONK
-#include "ExtVideoCodec.h"
-#endif
 
 extern "C" {
 #include "ccsdp.h"
@@ -1694,6 +1691,7 @@ static int vcmRxStartICE_m(cc_mcapid_t mcap_id,
     pc.impl()->media()->AddConduit(level, true, conduit);
 
     mozilla::VideoCodecConfig *config_raw;
+
     for(int i=0; i <num_payloads; i++)
     {
       config_raw = new mozilla::VideoCodecConfig(
@@ -1701,6 +1699,7 @@ static int vcmRxStartICE_m(cc_mcapid_t mcap_id,
         ccsdpCodecName(payloads[i].codec_type),
         payloads[i].video.rtcp_fb_types,
         pc.impl()->load_manager());
+
       if (vcmEnsureExternalCodec(conduit, config_raw, false)) {
         return VCM_ERROR;
       }
@@ -2111,33 +2110,6 @@ short vcmTxOpen(cc_mcapid_t mcap_id,
     return 0;
 }
 
-/*
- * Add an external encoder, maybe...
- */
-static int vcmEnsureExternalCodec(
-    const mozilla::RefPtr<mozilla::VideoSessionConduit>& conduit,
-    mozilla::VideoCodecConfig* config,
-    bool send)
-{
-#ifdef WEBRTC_GONK
-  MediaConduitErrorCode err = kMediaConduitNoError;
-  if (config->mName == "I420") {
-    if (send) {
-      conduit->SetExternalSendCodec(config->mType,
-                                    mozilla::ExtVideoCodec::CreateEncoder());
-    } else {
-      conduit->SetExternalRecvCodec(config->mType,
-                                    mozilla::ExtVideoCodec::CreateDecoder());
-    }
-  }
-
-  if (err != kMediaConduitNoError) {
-    return VCM_ERROR;
-  }
-#endif
-  return 0;
-}
-
 /**
  *  start tx stream
  *  Note: For video calls, for a given call_handle there will be
@@ -2251,6 +2223,33 @@ int vcmTxStart(cc_mcapid_t mcap_id,
     return VCM_ERROR;
 }
 
+
+/*
+ * Add an external encoder, maybe...
+ */
+static int vcmEnsureExternalCodec(
+    const mozilla::RefPtr<mozilla::VideoSessionConduit>& conduit,
+    mozilla::VideoCodecConfig* config,
+    bool send)
+{
+  MediaConduitErrorCode err = kMediaConduitNoError;
+
+  if (config->mName == "I420") {
+    if (send) {
+      conduit->SetExternalSendCodec(config->mType,
+                                    mozilla::OpenH264VideoCodec::CreateEncoder());
+    } else {
+      conduit->SetExternalRecvCodec(config->mType,
+                                    mozilla::OpenH264VideoCodec::CreateDecoder());
+    }
+  }
+
+  if (err != kMediaConduitNoError) {
+    return VCM_ERROR;
+  }
+
+  return 0;
+}
 
 /**
  *  start tx stream
@@ -3262,3 +3261,4 @@ short vcmGetVideoMaxFr(uint16_t codec,
                         &ret));
   return ret;
 }
+
