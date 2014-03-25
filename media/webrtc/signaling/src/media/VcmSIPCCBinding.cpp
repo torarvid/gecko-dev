@@ -37,6 +37,10 @@
 #include <sslproto.h>
 #include <algorithm>
 
+#ifdef MOZ_WIDGET_GONK
+#include "ExtVideoCodec.h"
+#endif
+
 extern "C" {
 #include "ccsdp.h"
 #include "vcm.h"
@@ -53,6 +57,11 @@ extern void lsm_start_continuous_tone_timer (vcm_tones_t tone,
 extern void lsm_update_active_tone(vcm_tones_t tone, cc_call_handle_t call_handle);
 extern void lsm_stop_multipart_tone_timer(void);
 extern void lsm_stop_continuous_tone_timer(void);
+
+static int vcmEnsureExternalCodec(
+  const mozilla::RefPtr<mozilla::VideoSessionConduit>& conduit,
+  mozilla::VideoCodecConfig* config,
+  bool send);
 
 }//end extern "C"
 
@@ -1685,7 +1694,6 @@ static int vcmRxStartICE_m(cc_mcapid_t mcap_id,
     pc.impl()->media()->AddConduit(level, true, conduit);
 
     mozilla::VideoCodecConfig *config_raw;
-
     for(int i=0; i <num_payloads; i++)
     {
       config_raw = new mozilla::VideoCodecConfig(
@@ -1693,6 +1701,9 @@ static int vcmRxStartICE_m(cc_mcapid_t mcap_id,
         ccsdpCodecName(payloads[i].codec_type),
         payloads[i].video.rtcp_fb_types,
         pc.impl()->load_manager());
+      if (vcmEnsureExternalCodec(conduit, config_raw, false)) {
+        return VCM_ERROR;
+      }
       configs.push_back(config_raw);
     }
 
@@ -2100,6 +2111,33 @@ short vcmTxOpen(cc_mcapid_t mcap_id,
     return 0;
 }
 
+/*
+ * Add an external encoder, maybe...
+ */
+static int vcmEnsureExternalCodec(
+    const mozilla::RefPtr<mozilla::VideoSessionConduit>& conduit,
+    mozilla::VideoCodecConfig* config,
+    bool send)
+{
+#ifdef WEBRTC_GONK
+  MediaConduitErrorCode err = kMediaConduitNoError;
+  if (config->mName == "I420") {
+    if (send) {
+      conduit->SetExternalSendCodec(config->mType,
+                                    mozilla::ExtVideoCodec::CreateEncoder());
+    } else {
+      conduit->SetExternalRecvCodec(config->mType,
+                                    mozilla::ExtVideoCodec::CreateDecoder());
+    }
+  }
+
+  if (err != kMediaConduitNoError) {
+    return VCM_ERROR;
+  }
+#endif
+  return 0;
+}
+
 /**
  *  start tx stream
  *  Note: For video calls, for a given call_handle there will be
@@ -2363,7 +2401,13 @@ static int vcmTxStartICE_m(cc_mcapid_t mcap_id,
       mozilla::VideoSessionConduit::Create(static_cast<VideoSessionConduit *>(rx_conduit.get()));
 
     // Find the appropriate media conduit config
-    if (!conduit || conduit->ConfigureSendMediaCodec(config))
+    if (!conduit)
+      return VCM_ERROR;
+
+    if (vcmEnsureExternalCodec(conduit, config_raw, true))
+      return VCM_ERROR;
+
+    if (conduit->ConfigureSendMediaCodec(config))
       return VCM_ERROR;
 
     pc.impl()->media()->AddConduit(level, false, conduit);
@@ -3218,4 +3262,3 @@ short vcmGetVideoMaxFr(uint16_t codec,
                         &ret));
   return ret;
 }
-

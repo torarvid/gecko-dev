@@ -12,9 +12,14 @@
 
 // Video Engine Includes
 #include "webrtc/common_types.h"
+#ifdef FF
+#undef FF
+#endif
+#include "webrtc/modules/video_coding/codecs/interface/video_codec_interface.h"
 #include "webrtc/video_engine/include/vie_base.h"
 #include "webrtc/video_engine/include/vie_capture.h"
 #include "webrtc/video_engine/include/vie_codec.h"
+#include "webrtc/video_engine/include/vie_external_codec.h"
 #include "webrtc/video_engine/include/vie_render.h"
 #include "webrtc/video_engine/include/vie_network.h"
 #include "webrtc/video_engine/include/vie_rtp_rtcp.h"
@@ -29,11 +34,18 @@
  using  webrtc::ViECapture;
  using  webrtc::ViERender;
  using  webrtc::ViEExternalCapture;
-
+ using  webrtc::ViEExternalCodec;
 
 namespace mozilla {
 
 class WebrtcAudioConduit;
+
+// Marker interfaces.
+class WebrtcVideoEncoder : public VideoEncoder, public webrtc::VideoEncoder {
+};
+
+class WebrtcVideoDecoder : public VideoDecoder, public webrtc::VideoDecoder {
+};
 
 /**
  * Concrete class for Video session. Hooks up
@@ -127,6 +139,10 @@ public:
                                                 VideoType video_type,
                                                 uint64_t capture_time);
 
+  virtual MediaConduitErrorCode SetExternalSendCodec(int pltype,
+                VideoEncoder* encoder);
+  virtual MediaConduitErrorCode SetExternalRecvCodec(int pltype,
+                VideoDecoder* decoder);
 
 
   /**
@@ -187,6 +203,9 @@ public:
                       mTransport(nullptr),
                       mRenderer(nullptr),
                       mPtrExtCapture(nullptr),
+#ifdef WEBRTC_GONK
+                      mExtDecoder(nullptr),
+#endif
                       mEngineTransmitting(false),
                       mEngineReceiving(false),
                       mChannel(-1),
@@ -267,6 +286,7 @@ private:
   ScopedCustomReleasePtr<webrtc::ViERTP_RTCP> mPtrRTP;
 
   webrtc::ViEExternalCapture* mPtrExtCapture; // shared
+  webrtc::ViEExternalCodec*  mPtrExtCodec;
 
   // Engine state we are concerned with.
   bool mEngineTransmitting; //If true ==> Transmit Sub-system is up and running
@@ -280,6 +300,10 @@ private:
   unsigned short mSendingHeight;
 
   mozilla::RefPtr<WebrtcAudioConduit> mSyncedTo;
+
+#ifdef MOZ_WIDGET_GONK
+  VideoDecoder* mExtDecoder;
+#endif
 };
 
 } // end namespace

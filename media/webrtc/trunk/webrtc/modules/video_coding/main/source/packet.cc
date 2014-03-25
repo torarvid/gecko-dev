@@ -111,6 +111,20 @@ void VCMPacket::CopyCodecSpecifics(const RTPVideoHeader& videoHeader)
                 codec = kVideoCodecVP8;
                 break;
             }
+        case kRtpVideoGeneric:
+            {
+                if (isFirstPacket && markerBit)
+                    completeNALU = kNaluComplete;
+                else if (isFirstPacket)
+                    completeNALU = kNaluStart;
+                else if (markerBit)
+                    completeNALU = kNaluEnd;
+                else
+                    completeNALU = kNaluIncomplete;
+
+                codec = kVideoCodecI420;
+                break;
+            }
         default:
             {
                 codec = kVideoCodecUnknown;

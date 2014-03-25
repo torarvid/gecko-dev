@@ -19,6 +19,13 @@
         'defines' : [
           'WEBRTC_GONK',
        ],
+        'cflags_mozilla': [
+          '-I$(ANDROID_SOURCE)/frameworks/av/include/media/stagefright',
+          '-I$(ANDROID_SOURCE)/frameworks/av/include',
+          '-I$(ANDROID_SOURCE)/frameworks/native/include/media/openmax',
+          '-I$(ANDROID_SOURCE)/frameworks/native/include',
+          '-I$(ANDROID_SOURCE)/frameworks/native/opengl/include',
+       ],
       }],
     ],
   },
@@ -57,6 +64,7 @@
         '../../../content/media',
         '../../../media/mtransport',
         '../trunk',
+        '../trunk/webrtc',
         '../trunk/webrtc/video_engine/include',
         '../trunk/webrtc/voice_engine/include',
         '../trunk/webrtc/modules/interface',
@@ -191,6 +199,12 @@
       # Conditionals
       #
       'conditions': [
+        ['moz_widget_toolkit_gonk==1', {
+          'sources': [
+            './src/media-conduit/WebrtcExtVideoCodec.cpp',
+            './src/media-conduit/ExtVideoCodec.cpp',
+          ],
+        }],
         ['build_for_test==0', {
           'defines' : [
             'MOZILLA_INTERNAL_API'

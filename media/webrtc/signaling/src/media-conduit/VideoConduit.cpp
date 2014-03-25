@@ -22,6 +22,12 @@
 
 #include <algorithm>
 #include <math.h>
+#include "ExtVideoCodec.h"
+
+#ifdef WEBRTC_GONK
+// for experiment
+#include <cutils/properties.h>
+#endif
 
 namespace mozilla {
 
@@ -78,6 +84,11 @@ WebrtcVideoConduit::~WebrtcVideoConduit()
       if (mOtherDirection)
         mOtherDirection->mPtrExtCapture = nullptr;
     }
+  }
+
+  if (mPtrExtCodec) {
+    mPtrExtCodec->Release();
+    mPtrExtCodec = NULL;
   }
 
   //Deal with External Renderer
@@ -269,6 +280,13 @@ MediaConduitErrorCode WebrtcVideoConduit::Init(WebrtcVideoConduit *other)
     return kMediaConduitSessionNotInited;
   }
 
+  mPtrExtCodec = webrtc::ViEExternalCodec::GetInterface(mVideoEngine);
+  if (!mPtrExtCodec) {
+    CSFLogError(logTag, "%s Unable to get external codec interface: %d ",
+                __FUNCTION__,mPtrViEBase->LastError());
+    return kMediaConduitSessionNotInited;
+  }
+
   if( !(mPtrRTP = webrtc::ViERTP_RTCP::GetInterface(mVideoEngine)))
   {
     CSFLogError(logTag, "%s Unable to get video RTCP interface ", __FUNCTION__);
@@ -387,7 +405,6 @@ WebrtcVideoConduit::AttachRenderer(mozilla::RefPtr<VideoRenderer> aVideoRenderer
   if(!mRenderer)
   {
     mRenderer = aVideoRenderer; // must be done before StartRender()
-
     if(mPtrViERender->StartRender(mChannel) == -1)
     {
       CSFLogError(logTag, "%s Starting the Renderer Failed %d ", __FUNCTION__,
@@ -399,7 +416,11 @@ WebrtcVideoConduit::AttachRenderer(mozilla::RefPtr<VideoRenderer> aVideoRenderer
     //Assign the new renderer - overwrites if there is already one
     mRenderer = aVideoRenderer;
   }
-
+#ifdef WEBRTC_GONK
+  if (mExtDecoder) {
+    mExtDecoder->SetRenderer(mRenderer);
+  }
+#endif
   return kMediaConduitNoError;
 }
 
@@ -410,6 +431,9 @@ WebrtcVideoConduit::DetachRenderer()
   {
     mPtrViERender->StopRender(mChannel);
     mRenderer = nullptr;
+#ifdef WEBRTC_GONK
+    mExtDecoder->SetRenderer(nullptr);
+#endif
   }
 }
 
@@ -493,6 +517,16 @@ WebrtcVideoConduit::ConfigureSendMediaCodec(const VideoCodecConfig* codecConfig)
     CSFLogError(logTag, "%s Codec Mismatch ", __FUNCTION__);
     return kMediaConduitInvalidSendCodec;
   }
+
+#ifdef WEBRTC_GONK
+  CSFLogDebug(logTag, "Disabling frame dropper (send) for video stream\n");
+  if (mPtrRTP->SetSenderBufferingMode(mChannel, 1) != 0)
+  {
+    CSFLogError(logTag,  "%s SenderBufferingMode Failed %d ", __FUNCTION__,
+                mPtrViEBase->LastError());
+    return kMediaConduitUnknownError;
+  }
+#endif
 
   if(mPtrViECodec->SetSendCodec(mChannel, video_codec) == -1)
   {
@@ -836,6 +870,36 @@ WebrtcVideoConduit::SelectSendResolution(unsigned short width,
 }
 
 MediaConduitErrorCode
+WebrtcVideoConduit::SetExternalSendCodec(int pltype,
+                                         VideoEncoder* encoder) {
+  mPtrExtCodec->RegisterExternalSendCodec(mChannel,
+                                          pltype,
+                                          static_cast<
+                                          WebrtcVideoEncoder*>(encoder), false);
+
+  return kMediaConduitNoError;
+}
+
+MediaConduitErrorCode
+WebrtcVideoConduit::SetExternalRecvCodec(int pltype,
+                                         VideoDecoder* decoder) {
+  mPtrExtCodec->RegisterExternalReceiveCodec(mChannel,
+                                             pltype,
+                                             static_cast<
+                                             WebrtcVideoDecoder*>(decoder));
+#ifdef WEBRTC_GONK
+  // FIXME: create I420VideoFrame sublass that carries gralloc images to obsolete
+  //        SetRenderer()/SetCurrentFrame() hack.
+  WebrtcVideoDecoder* dec = static_cast<WebrtcVideoDecoder*>(decoder);
+  if (mRenderer.get()) {
+    dec->SetRenderer(mRenderer);
+  }
+  mExtDecoder = dec;
+#endif
+  return kMediaConduitNoError;
+}
+
+MediaConduitErrorCode
 WebrtcVideoConduit::SendVideoFrame(unsigned char* video_frame,
                                    unsigned int video_frame_length,
                                    unsigned short width,
@@ -1045,20 +1109,27 @@ WebrtcVideoConduit::DeliverFrame(unsigned char* buffer,
 /**
  * Copy the codec passed into Conduit's database
  */
-
 void
 WebrtcVideoConduit::CodecConfigToWebRTCCodec(const VideoCodecConfig* codecInfo,
                                               webrtc::VideoCodec& cinst)
 {
   cinst.plType  = codecInfo->mType;
   // leave width/height alone; they'll be overridden on the first frame
-  if (codecInfo->mMaxFrameRate > 0)
-  {
-    cinst.maxFramerate = codecInfo->mMaxFrameRate;
-  }
-  cinst.minBitrate = 200;
+#ifdef WEBRTC_GONK
+  // FIXME: eliminate experimental property
+  char br[32];
+  property_get("webrtc.bitrate_min", br, "400");
+  cinst.minBitrate = atoi(br);
+#endif
+
   cinst.startBitrate = 300;
-  cinst.maxBitrate = 2000;
+  if (cinst.startBitrate < cinst.minBitrate) {
+    cinst.startBitrate = cinst.minBitrate;
+  }
+#ifdef WEBRTC_GONK
+  property_get("webrtc.bitrate_max", br, "450");
+  cinst.maxBitrate = atoi(br);
+#endif
 }
 
 //Copy the codec passed into Conduit's database

@@ -647,7 +647,11 @@ class MediaPipelineReceiveVideo : public MediaPipelineReceive {
       pipeline_->listener_->RenderVideoFrame(buffer, buffer_size, time_stamp,
                                             render_time);
     }
-
+#ifdef WEBRTC_GONK
+    virtual void SetCurrentFrame(void* buffer) {
+      pipeline_->listener_->SetCurrentFrame(buffer);
+    }
+#endif
    private:
     MediaPipelineReceiveVideo *pipeline_;  // Raw pointer to avoid cycles
   };
@@ -680,6 +684,7 @@ class MediaPipelineReceiveVideo : public MediaPipelineReceive {
                           uint32_t time_stamp,
                           int64_t render_time);
 
+    void SetCurrentFrame(void* buffer);
 
    private:
     int width_;
