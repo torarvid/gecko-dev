@@ -274,13 +274,16 @@ nsresult PeerConnectionCtx::Initialize() {
 
 #ifdef MOZILLA_INTERNAL_API
   if (Preferences::GetBool("media.peerconnection.video.h264_enabled", true)) {
+    printf_stderr("TAL:PeerConnection:H264 enabled\n");
     codecMask |= VCM_CODEC_RESOURCE_H264;
   }
 #endif
 
-  codecMask |= VCM_CODEC_RESOURCE_VP8;
+  //codecMask |= VCM_CODEC_RESOURCE_VP8;
   //codecMask |= VCM_CODEC_RESOURCE_I420;
   mCCM->setVideoCodecs(codecMask);
+
+  printf_stderr("TAL:Video codec mask: %d\n", codecMask);
 
   ccAppReadyToStartLock = PR_NewLock();
   if (!ccAppReadyToStartLock) {
